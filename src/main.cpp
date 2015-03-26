@@ -9,6 +9,9 @@
 #include <iostream>
 #include <fstream>
 
+#include "brukerrawdata.hpp"
+#include "brukerparameterparser.hpp"
+
 #include "ismrmrd/ismrmrd.h"
 #include "ismrmrd/xml.h"
 #include "ismrmrd/dataset.h"
@@ -50,18 +53,38 @@ int main(int argc, char** argv)
 
     std::cout << "Burker ISMRMRD converter" << std::endl;
 
+    // The names of the files in the Bruker dataset
+    std::string fidfilename = in_filename + std::string("/fid");
+    std::string acqpfilename = in_filename + std::string("/acqp");
+    std::string methodfilename = in_filename + std::string("/method");
+
+    // Parse Bruker parameters
+    BrukerParameterFile par(acqpfilename);
+    BrukerParameterFile methodpar(methodfilename);
+
+    // Get the number of encoding steps
+    BrukerParameter* p = methodpar.FindParameter("PVM_EncSteps1");
+    if (p) {
+      for (int i = 0; i < p->GetNumberOfValues(); i++) {
+          std::cout << "Encoding step = " << p->GetValue(i)->GetIntValue() << std::endl;
+      }
+    } else {
+      std::cerr << "Unable to find PVM_EncSteps1 needed to determine output" << std::endl;
+      return -1;
+    }
+
     // Create the dataset
     ISMRMRD::Dataset dataset(out_filename.c_str(), out_group.c_str());
 
-    /* some initializations */
+    // Some initializations
     ISMRMRD::Acquisition acq;
     int nx = 128;
     int ny = 128;
     int nz = 3;
     int nc = 8;
    
-    // open input file
-    std::ifstream file_1(in_filename.c_str());
+    // open input fid file
+    std::ifstream file_1(fidfilename.c_str());
     if (!file_1)
     {
         std::cout << "Provided Bruker file cannot be open or does not exist." << std::endl;
