@@ -1,0 +1,24 @@
+build
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+*tar
+*gz
+*zip
+*bz2
+*pdf
+
+*~
+*swp
