@@ -78,7 +78,8 @@ int main(int argc, char** argv)
     int kz_max = lg.GetMaxEncodingStep2();
 
     // Some parameters from the acqp and method files
-    // TODO many of these can probably found in the lg above
+    // TODO most of these can probably found in the lg above
+    // have to add some methods to the BrukerProfileListGenerator
     BrukerParameter* p;
     p = acqpar.FindParameter("SW");
     int freq = floor(p->GetValue(0)->GetFloatValue() * 1000000);
