@@ -59,30 +59,59 @@ int main(int argc, char** argv)
     std::string methodfilename = in_filename + std::string("/method");
 
     // Parse Bruker parameters
-    BrukerParameterFile par(acqpfilename);
+    BrukerParameterFile acqpar(acqpfilename);
     BrukerParameterFile methodpar(methodfilename);
 
-    // Get the number of encoding steps
-    BrukerParameter* p = methodpar.FindParameter("PVM_EncSteps1");
-    if (p) {
-      for (int i = 0; i < p->GetNumberOfValues(); i++) {
-          std::cout << "Encoding step = " << p->GetValue(i)->GetIntValue() << std::endl;
-      }
-    } else {
-      std::cerr << "Unable to find PVM_EncSteps1 needed to determine output" << std::endl;
-      return -1;
-    }
+    // Get the profile list
+    BrukerProfileListGenerator lg;
+    BrukerRawDataProfile* first = lg.GetProfileList(&acqpar,&methodpar);
 
+    int size_kx = lg.GetDimensionSize(0);
+    int size_ky = lg.GetDimensionSize(1); if (size_ky == 0) size_ky++;
+    int size_kz = lg.GetDimensionSize(2); if (size_kz == 0) size_kz++;
+    int no_objects = lg.GetNumberOfObjects();
+    int no_repetitions = lg.GetNumberOfRepetitions();
+
+    int ky_min = lg.GetMinEncodingStep1();
+    int ky_max = lg.GetMaxEncodingStep1();
+    int kz_min = lg.GetMinEncodingStep2();
+    int kz_max = lg.GetMaxEncodingStep2();
+
+    BrukerParameter* p;
+    p = acqpar.FindParameter("SW");
+    int freq = floor(p->GetValue(0)->GetFloatValue() * 1000000);
+
+    p = methodpar.FindParameter("PVM_EncAvailReceivers");
+    int nc = p->GetValue(0)->GetIntValue();
+    
+    p = methodpar.FindParameter("PVM_EncMatrix");
+    int nx = p->GetValue(0)->GetIntValue();
+    int ny = p->GetValue(1)->GetIntValue();
+    int nz = lg.GetNumberOfObjects();
+ 
+    p = methodpar.FindParameter("PVM_Fov");
+    int fovx = p->GetValue(0)->GetIntValue();
+    int fovy = p->GetValue(1)->GetIntValue();
+    p = acqpar.FindParameter("ACQ_slice_thick");
+    int fovz = p->GetValue(0)->GetIntValue();
+        
+    // Write some info out to the user
+    //lg.PrintParameters();            
+    //std::cout << "Frequency: " << freq << std::endl;
+    //std::cout << "Number of channels: " << nc << std::endl;
+    //std::cout << "Nx: " << nx << std::endl;
+    //std::cout << "Ny: " << ny << std::endl;
+    //std::cout << "Nz: " << nz << std::endl;
+    //std::cout << "FOV_x: " << fovx << std::endl;
+    //std::cout << "FOV_y: " << fovy << std::endl;
+    //std::cout << "FOV_z: " << fovz << std::endl;
+    
+    // Some initializations
+    ISMRMRD::Acquisition acq;
+    
     // Create the dataset
     ISMRMRD::Dataset dataset(out_filename.c_str(), out_group.c_str());
 
-    // Some initializations
-    ISMRMRD::Acquisition acq;
-    int nx = 128;
-    int ny = 128;
-    int nz = 3;
-    int nc = 8;
-   
     // open input fid file
     std::ifstream file_1(fidfilename.c_str());
     if (!file_1)
@@ -95,11 +124,10 @@ int main(int argc, char** argv)
         std::cout << "Bruker file is: " << in_filename << std::endl;
     }
 
-
     //Let's create a header, we will use the C++ classes in ismrmrd/xml.h
     ISMRMRD::IsmrmrdHeader h;
     h.version = ISMRMRD_XMLHDR_VERSION;
-    h.experimentalConditions.H1resonanceFrequency_Hz = 63500000; //~1.5T        
+    h.experimentalConditions.H1resonanceFrequency_Hz = freq;
 
     ISMRMRD::AcquisitionSystemInformation sys;
     sys.institutionName = "Mouse Imaging Facility";
@@ -111,15 +139,15 @@ int main(int argc, char** argv)
     e.encodedSpace.matrixSize.x = nx;
     e.encodedSpace.matrixSize.y = ny;
     e.encodedSpace.matrixSize.z = 1;
-    e.encodedSpace.fieldOfView_mm.x = 30;
-    e.encodedSpace.fieldOfView_mm.y = 30;
-    e.encodedSpace.fieldOfView_mm.z = 1;
+    e.encodedSpace.fieldOfView_mm.x = fovx;
+    e.encodedSpace.fieldOfView_mm.y = fovy;
+    e.encodedSpace.fieldOfView_mm.z = fovz;
     e.reconSpace.matrixSize.x = nx;
     e.reconSpace.matrixSize.y = ny;
     e.reconSpace.matrixSize.z = 1;
-    e.reconSpace.fieldOfView_mm.x = 30;
-    e.reconSpace.fieldOfView_mm.y = 30;
-    e.reconSpace.fieldOfView_mm.z = 1;
+    e.reconSpace.fieldOfView_mm.x = fovx;
+    e.reconSpace.fieldOfView_mm.y = fovy;
+    e.reconSpace.fieldOfView_mm.z = fovz;
     e.trajectory = "cartesian";
     e.encodingLimits.kspace_encoding_step_1 = ISMRMRD::Limit(0, ny-1, ny/2);
     e.encodingLimits.slice = ISMRMRD::Limit(0, nz-1, nz/2);
@@ -133,22 +161,23 @@ int main(int argc, char** argv)
     std::stringstream str;
     ISMRMRD::serialize( h, str);
     std::string xml_header = str.str();
-    std::cout << xml_header << std::endl;
+    //std::cout << xml_header << std::endl;
         
     //Write the header to the data file.
     dataset.writeHeader(xml_header);
+    std::cout << "Wrote XML header" << std::endl;
 
     // Create an acquisition structure
-    std::cout << "Initializing acquisition header" << std::endl;
     acq.resize(nx,nc);
     acq.center_sample() = nx/2;
+
+    // These are definitely wrong
+    // Consider looking at ACQ_grad_matrix?
     acq.read_dir()[0] = 1.;
     acq.phase_dir()[1] = 1.;
     acq.slice_dir()[2] = 1.;
 
     // loop over data set to read it in, convert it and write it out
-    std::cout << "Starting the big loop" << std::endl;
-
     // a buffer for reading the data
     int32_t kdata[2*nx*nc];
 
@@ -186,4 +215,8 @@ int main(int argc, char** argv)
 
     // Close the Bruker file (is this necessary?)
     file_1.close();
+
+    // Goodbye
+    std::cout << "Conversion complete." << std::endl;
+
 }
