@@ -28,6 +28,9 @@ public:
   void SetProfileLength(unsigned int);
   unsigned int GetProfileLength();
 
+  void SetNumberOfChannels(unsigned int);
+  unsigned int GetNumberOfChannels();
+    
   void SetEncodeStep1(int e);
   int GetEncodeStep1();
 
@@ -77,6 +80,7 @@ public:
 
 protected:
   unsigned int m_uiProfileLength;
+  unsigned int m_uiNumberOfChannels;
   int m_iEncodeStep1;    /* ky */
   int m_iEncodeStep2;    /* kz */
   unsigned int m_uiChannelNo;   
@@ -113,6 +117,7 @@ public:
   
   void PrintParameters();
 
+  int GetNumberOfChannels() { return m_NumChannels; }
   int GetNumberOfDimensions() { return m_ACQ_dim; }
   int GetDimensionSize(int dimension = 0);
   int GetNumberOfObjects() {return m_NI;}
@@ -127,6 +132,7 @@ protected:
   
   int  m_ACQ_dim;
   int* m_ACQ_size;
+  int  m_NumChannels;
   int* m_PVM_matrix;
   float* m_PVM_AntiAlias;
   int  m_NI;

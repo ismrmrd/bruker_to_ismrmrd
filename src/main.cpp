@@ -30,11 +30,11 @@ int main(int argc, char** argv)
     po::options_description desc("Allowed options");
 
     desc.add_options()
-        ("help,h", "produce help message")
-        ("filename,f", po::value<std::string>(&in_filename), "Input file")
-        ("outfile,o", po::value<std::string>(&out_filename)->default_value("out.h5"), "Output file")
-        ("out-group,G", po::value<std::string>(&out_group)->default_value("dataset"), "Output group name")  
-        ;
+            ("help,h", "produce help message")
+            ("filename,f", po::value<std::string>(&in_filename), "Input file")
+            ("outfile,o", po::value<std::string>(&out_filename)->default_value("out.h5"), "Output file")
+            ("out-group,G", po::value<std::string>(&out_group)->default_value("dataset"), "Output group name")  
+            ;
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -62,39 +62,39 @@ int main(int argc, char** argv)
     BrukerParameterFile acqpar(acqpfilename);
     BrukerParameterFile methodpar(methodfilename);
 
-    // Get the profile list
+    // Get the profile list and the first profile
     BrukerProfileListGenerator lg;
     BrukerRawDataProfile* first = lg.GetProfileList(&acqpar,&methodpar);
 
+    // Some parameters from the profile list
     int size_kx = lg.GetDimensionSize(0);
     int size_ky = lg.GetDimensionSize(1); if (size_ky == 0) size_ky++;
     int size_kz = lg.GetDimensionSize(2); if (size_kz == 0) size_kz++;
     int no_objects = lg.GetNumberOfObjects();
     int no_repetitions = lg.GetNumberOfRepetitions();
-
     int ky_min = lg.GetMinEncodingStep1();
     int ky_max = lg.GetMaxEncodingStep1();
     int kz_min = lg.GetMinEncodingStep2();
     int kz_max = lg.GetMaxEncodingStep2();
 
+    // Some parameters from the acqp and method files
+    // TODO many of these can probably found in the lg above
     BrukerParameter* p;
     p = acqpar.FindParameter("SW");
     int freq = floor(p->GetValue(0)->GetFloatValue() * 1000000);
 
-    p = methodpar.FindParameter("PVM_EncAvailReceivers");
-    int nc = p->GetValue(0)->GetIntValue();
-    
     p = methodpar.FindParameter("PVM_EncMatrix");
     int nx = p->GetValue(0)->GetIntValue();
     int ny = p->GetValue(1)->GetIntValue();
     int nz = lg.GetNumberOfObjects();
- 
+    int nc = lg.GetNumberOfChannels();
+
     p = methodpar.FindParameter("PVM_Fov");
     int fovx = p->GetValue(0)->GetIntValue();
     int fovy = p->GetValue(1)->GetIntValue();
     p = acqpar.FindParameter("ACQ_slice_thick");
     int fovz = p->GetValue(0)->GetIntValue();
-        
+
     // Write some info out to the user
     //lg.PrintParameters();            
     //std::cout << "Frequency: " << freq << std::endl;
@@ -106,23 +106,8 @@ int main(int argc, char** argv)
     //std::cout << "FOV_y: " << fovy << std::endl;
     //std::cout << "FOV_z: " << fovz << std::endl;
     
-    // Some initializations
-    ISMRMRD::Acquisition acq;
-    
     // Create the dataset
     ISMRMRD::Dataset dataset(out_filename.c_str(), out_group.c_str());
-
-    // open input fid file
-    std::ifstream file_1(fidfilename.c_str());
-    if (!file_1)
-    {
-        std::cout << "Provided Bruker file cannot be open or does not exist." << std::endl;
-        return -1;
-    }
-    else
-    {
-        std::cout << "Bruker file is: " << in_filename << std::endl;
-    }
 
     //Let's create a header, we will use the C++ classes in ismrmrd/xml.h
     ISMRMRD::IsmrmrdHeader h;
@@ -167,54 +152,77 @@ int main(int argc, char** argv)
     dataset.writeHeader(xml_header);
     std::cout << "Wrote XML header" << std::endl;
 
-    // Create an acquisition structure
+    // Create an ISMRMRD acquisition
+    ISMRMRD::Acquisition acq;
     acq.resize(nx,nc);
     acq.center_sample() = nx/2;
 
-    // These are definitely wrong
+    // TODO: These are definitely wrong
     // Consider looking at ACQ_grad_matrix?
     acq.read_dir()[0] = 1.;
     acq.phase_dir()[1] = 1.;
     acq.slice_dir()[2] = 1.;
 
-    // loop over data set to read it in, convert it and write it out
-    // a buffer for reading the data
-    int32_t kdata[2*nx*nc];
+    // open input fid file
+    std::ifstream fidfile;
+    fidfile.open(fidfilename.c_str(),std::ifstream::in | std::ifstream::binary );
+    if (!fidfile)
+    {
+        std::cerr << "Error opening fid file" << in_filename << std::endl;
+        return -1;
+    }
+    else
+    {
+        std::cout << "Reading from fid file " << in_filename << std::endl;
+    }
 
-    int counter = 0;
-    for(int i=0;i<ny;i++) {
-        for(int j=0;j<nz;j++) {
-            acq.scan_counter() = counter;
-            acq.idx().kspace_encode_step_1 = i;
-            acq.idx().slice = j;
-           
-            //Set some flags
-            acq.clearAllFlags();
-            if (i == 0) {
-                acq.setFlag(ISMRMRD::ISMRMRD_ACQ_FIRST_IN_SLICE);
-                acq.setFlag(ISMRMRD::ISMRMRD_ACQ_FIRST_IN_ENCODE_STEP1);
-                acq.setFlag(ISMRMRD::ISMRMRD_ACQ_FIRST_IN_REPETITION);
-            }
-            if (i == (ny-1)) {
-                acq.setFlag(ISMRMRD::ISMRMRD_ACQ_LAST_IN_SLICE);
-                acq.setFlag(ISMRMRD::ISMRMRD_ACQ_LAST_IN_ENCODE_STEP1);
-                acq.setFlag(ISMRMRD::ISMRMRD_ACQ_LAST_IN_REPETITION);
-            }
+    // Loop over data set to read it in, convert it and write it out
+    int64_t counter = 0;
+    BrukerRawDataProfile* current = first;
+    float* data_ptr = 0;
 
-            file_1.read(reinterpret_cast<char*>(kdata), sizeof(int32_t) * (nx*nc*2));
-            // need to convert to complex float
-            for (int c=0; c<nc; c++) {
-                for (int s=0; s< nx; s++) {
-                    acq.data(s,c) = std::complex<float>(kdata[2*(c*nx+s)], kdata[2*(c*nx+s)+1]);
-                }
-            }
-            dataset.appendAcquisition(acq);
-            counter++;
+    while (current) {
+
+        acq.scan_counter() = counter;
+        acq.idx().kspace_encode_step_1 = current->GetEncodeStep1()+(size_ky>>1);
+        acq.idx().slice = current->GetObjectNo();
+        acq.idx().repetition = current->GetRepetitionNo();
+
+        // Set some flags
+        // TODO: this needs fleshing out
+        acq.clearAllFlags();
+        if (current->GetEncodeStep1() == ky_min) {
+            acq.setFlag(ISMRMRD::ISMRMRD_ACQ_FIRST_IN_SLICE);
+            acq.setFlag(ISMRMRD::ISMRMRD_ACQ_FIRST_IN_ENCODE_STEP1);
+            acq.setFlag(ISMRMRD::ISMRMRD_ACQ_FIRST_IN_REPETITION);
         }
+        if (current->GetEncodeStep1() == ky_max) {
+            acq.setFlag(ISMRMRD::ISMRMRD_ACQ_LAST_IN_SLICE);
+            acq.setFlag(ISMRMRD::ISMRMRD_ACQ_LAST_IN_ENCODE_STEP1);
+            acq.setFlag(ISMRMRD::ISMRMRD_ACQ_LAST_IN_REPETITION);
+        }
+
+        // read the data
+        // convert to complex float and stuff
+        current->SetProfileLength(nx*nc);
+        current->ReadData(fidfile);
+        data_ptr = current->GetDataPtr();
+        for (int c=0; c<nc; c++) {
+            for (int s=0; s< nx; s++) {
+                acq.data(s,c) = std::complex<float>(data_ptr[2*(nx*c+s)], data_ptr[2*(nx*c+s)+1]);
+            }
+        }
+
+        // append to the dataset
+        dataset.appendAcquisition(acq);
+
+        // next
+        current = current->GetNext();
+        counter++;
     }
 
     // Close the Bruker file (is this necessary?)
-    file_1.close();
+    fidfile.close();
 
     // Goodbye
     std::cout << "Conversion complete." << std::endl;

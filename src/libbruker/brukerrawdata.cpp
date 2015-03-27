@@ -3,6 +3,7 @@
 
 BrukerRawDataProfile::BrukerRawDataProfile()
   : m_uiProfileLength(0),
+    m_uiNumberOfChannels(0),
     m_iEncodeStep1(0),
     m_iEncodeStep2(0),
     m_uiChannelNo(0),
@@ -31,6 +32,17 @@ unsigned int BrukerRawDataProfile::GetProfileLength()
 {
 
   return m_uiProfileLength;
+}
+
+void BrukerRawDataProfile::SetNumberOfChannels(unsigned int nchan)
+{
+  m_uiNumberOfChannels = nchan;
+}
+
+unsigned int BrukerRawDataProfile::GetNumberOfChannels()
+{
+
+  return m_uiNumberOfChannels;
 }
 
 void BrukerRawDataProfile::SetEncodeStep1(int e)
@@ -545,6 +557,11 @@ void BrukerProfileListGenerator::ExtractParametersFromAcq(BrukerParameterFile* a
   }
 
   if (method) {
+    p = method->FindParameter(std::string("PVM_EncAvailReceivers"));
+    if (p) {
+      m_NumChannels = p->GetValue(0)->GetIntValue();
+    }
+
     m_PVM_matrix = new int[m_ACQ_dim];
     m_PVM_AntiAlias = new float[m_ACQ_dim];
     if (!m_PVM_matrix || !m_PVM_AntiAlias) {
@@ -769,7 +786,7 @@ BrukerRawDataProfile* BrukerProfileListGenerator::GetProfileList(BrukerParameter
     } else {
       data_size = 2;
     }
-    profile_data_length = m_ACQ_size[0]*data_size;
+    profile_data_length = m_ACQ_size[0]*m_NumChannels*data_size;
     if (profile_data_length % 1024) {
       profile_data_length = ((profile_data_length / 1024)+1)*1024;
     }
@@ -790,6 +807,7 @@ BrukerRawDataProfile* BrukerProfileListGenerator::GetProfileList(BrukerParameter
 	    current = new_p;
 	    
 	    current->SetProfileLength(m_ACQ_size[0]/2);
+	    current->SetNumberOfChannels(m_NumChannels);
 	    if (m_ACQ_spatial_size_1 > 0) {
 	      current->SetEncodeStep1(m_ky_profile_order[e1*m_ACQ_phase_factor+ph]);
 	    } 
