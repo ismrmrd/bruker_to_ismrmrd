@@ -4,7 +4,7 @@ add_subdirectory(libbruker)
 # Build the converter
 find_package(Ismrmrd REQUIRED)
 
-set(Boost_NO_BOOST_CMAKE ON)
+#set(Boost_NO_BOOST_CMAKE ON)
 
 if(WIN32)
   find_package(Boost COMPONENTS program_options thread system date_time chrono REQUIRED)

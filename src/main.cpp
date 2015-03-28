@@ -96,8 +96,34 @@ int main(int argc, char** argv)
     p = acqpar.FindParameter("ACQ_slice_thick");
     int fovz = p->GetValue(0)->GetIntValue();
 
+    p = methodpar.FindParameter("PVM_SpatDimEnum");
+    std::string image_type = p->GetValue(0)->GetStringValue(); // 2D or 3D acq marker
+    p = methodpar.FindParameter("PVM_SpatDimEnum");
+    int nspack = p->GetValue(0)->GetIntValue();
+    float read_offset_mm[nspack]; //each package has a set of offsets
+    p = methodpar.FindParameter("PVM_SPackArrReadOffset"); 
+    for ( int i=0; i<nspack ; i++ ) { 
+       read_offset_mm[i] = p->GetValue(i)->GetFloatValue();
+    }
+    float phase1_offset_mm[nspack]; 
+    p = methodpar.FindParameter("PVM_SPackArrPhase1Offset");
+    for ( int i=0; i<nspack ; i++ ) {
+       phase1_offset_mm[i] = p->GetValue(i)->GetFloatValue();
+    }
+//    p = methodpar.FindParameter("PVM_SpackArrSliceOrient");
+//    std::string slice_orientation[nspack];
+//    for ( int i=0; i<nspack ; i++ ) {
+//       slice_orientation[i] = p->GetValue(i)->GetStringValue(); 
+//    }
+//    p = methodpar.FindParameter("PVM_SPackArrReadOrient");
+//    std::string read_orientation[nspack];
+//    for( int i=0; i<nspack ;i++ ) {
+//       read_orientation[i] = p->GetValue(i)->GetStringValue();
+//    }
+
     // Write some info out to the user
     //lg.PrintParameters();            
+    std::cout << "Spatial Dimensions: " << image_type << std::endl;
     //std::cout << "Frequency: " << freq << std::endl;
     //std::cout << "Number of channels: " << nc << std::endl;
     //std::cout << "Nx: " << nx << std::endl;
@@ -106,7 +132,20 @@ int main(int argc, char** argv)
     //std::cout << "FOV_x: " << fovx << std::endl;
     //std::cout << "FOV_y: " << fovy << std::endl;
     //std::cout << "FOV_z: " << fovz << std::endl;
-    
+    std::cout <<"nspack: " << nspack << std::endl;
+    for ( int i=0; i< nspack; i++) {
+       std::cout <<"read_offset_mm[" << i <<  "]: " << read_offset_mm[i] << std::endl;
+    }
+    for ( int i=0; i< nspack; i++) {
+       std::cout <<"phase1_offset_mm[" << i << "]: " << phase1_offset_mm[i] << std::endl;
+    }
+//    for ( int i=0; i< nspack; i++) {
+//        std::cout << "Slice Orientation:[" << i << "]:" << slice_orientation[i] << std::endl;
+//    }
+//    for ( int i=0; i< nspack; i++) {
+//        std::cout << "Read Orientation:[" << i << "]:" << read_orientation[i] << std::endl;
+//    }
+
     // Create the dataset
     ISMRMRD::Dataset dataset(out_filename.c_str(), out_group.c_str());
 
