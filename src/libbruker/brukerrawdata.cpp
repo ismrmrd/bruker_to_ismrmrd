@@ -8,6 +8,8 @@ BrukerRawDataProfile::BrukerRawDataProfile()
     m_iEncodeStep2(0),
     m_uiChannelNo(0),
     m_uiObjectNo(0),
+    m_uiSliceNo(0),
+    m_uiEchoNo(0),
     m_uiRepetitionNo(0),
     m_ulFilePosition(0),
     m_pData(0),
@@ -83,6 +85,26 @@ void BrukerRawDataProfile::SetObjectNo(unsigned int o)
 unsigned int BrukerRawDataProfile::GetObjectNo()
 {
   return m_uiObjectNo;
+}
+
+void BrukerRawDataProfile::SetSliceNo(unsigned int s)
+{
+  m_uiSliceNo = s;
+}
+
+unsigned int BrukerRawDataProfile::GetSliceNo()
+{
+  return m_uiSliceNo;
+}
+
+void BrukerRawDataProfile::SetEchoNo(unsigned int e)
+{
+  m_uiEchoNo = e;
+}
+
+unsigned int BrukerRawDataProfile::GetEchoNo()
+{
+  return m_uiEchoNo;
 }
 
 void BrukerRawDataProfile::SetRepetitionNo(unsigned int r)
@@ -492,6 +514,8 @@ BrukerProfileListGenerator::BrukerProfileListGenerator()
     m_PVM_AntiAlias(0),
     m_NI(0),
     m_ACQ_obj_order(0),
+    m_NSLICES(0),
+    m_ACQ_n_echo_images(0),
     m_ACQ_phase_factor(0),
     m_ACQ_rare_factor(0),
     m_NR(0),
@@ -610,6 +634,16 @@ void BrukerProfileListGenerator::ExtractParametersFromAcq(BrukerParameterFile* a
       m_ACQ_obj_order[i] = p->GetValue(i)->GetIntValue();
     }
 
+  }
+
+  p = acqp->FindParameter(std::string("NSLICES"));
+  if (p) {
+    m_NSLICES = p->GetValue()->GetIntValue();
+  }
+
+  p = acqp->FindParameter(std::string("ACQ_n_echo_images"));
+  if (p) {
+    m_ACQ_n_echo_images = p->GetValue()->GetIntValue();
   }
   
   p = acqp->FindParameter(std::string("ACQ_phase_factor"));
@@ -795,38 +829,41 @@ BrukerRawDataProfile* BrukerProfileListGenerator::GetProfileList(BrukerParameter
   for (int nr = 0; nr < m_NR; nr++) { /* Repeated measurements */
     for (int e2 = 0; e2 < ((m_ACQ_dim <= 2) ? 1 : m_ACQ_size[2]); e2++) {
       for (int e1 = 0; e1 < ((m_ACQ_dim <= 1) ? 1 : (m_ACQ_size[1]/m_ACQ_phase_factor)); e1++) {
-	for (int ni = 0; ni < m_NI; ni++) {
+	for (int ns = 0; ns < m_NSLICES; ns++) {
 	  for (int ph = 0; ph < m_ACQ_phase_factor; ph++) {
-	    BrukerRawDataProfile* new_p = new BrukerRawDataProfile();  
-	    if (!first) {
-	      first = new_p;
-	    } else {
-	      current->SetNext(new_p);
-	      new_p->SetPrevious(current);
-	    }
-	    current = new_p;
+            for (int ne = 0; ne < m_ACQ_n_echo_images; ne++) {
+              BrukerRawDataProfile* new_p = new BrukerRawDataProfile();  
+              if (!first) {
+                first = new_p;
+              } else {
+                current->SetNext(new_p);
+                new_p->SetPrevious(current);
+              }
+              current = new_p;
 	    
-	    current->SetProfileLength(m_ACQ_size[0]/2);
-	    current->SetNumberOfChannels(m_NumChannels);
-	    if (m_ACQ_spatial_size_1 > 0) {
-	      current->SetEncodeStep1(m_ky_profile_order[e1*m_ACQ_phase_factor+ph]);
-	    } 
-	    if (m_ACQ_spatial_size_2 > 0) {
-	      current->SetEncodeStep2(m_kz_profile_order[e2]);
-	    } 
+              current->SetProfileLength(m_ACQ_size[0]/2);
+              current->SetNumberOfChannels(m_NumChannels);
+              if (m_ACQ_spatial_size_1 > 0) {
+                current->SetEncodeStep1(m_ky_profile_order[e1*m_ACQ_phase_factor+ph]);
+              } 
+              if (m_ACQ_spatial_size_2 > 0) {
+                current->SetEncodeStep2(m_kz_profile_order[e2]);
+              } 
 	    
-	    /* TODO: Deal with multichannel data */
-	    //current->SetChannelNo(0);
+              /* TODO: Deal with multichannel data */
+              //current->SetChannelNo(0);
 	    
-	    current->SetObjectNo(m_ACQ_obj_order[ni]);
+              current->SetSliceNo(m_ACQ_obj_order[ns]);
 	    
-	    current->SetRepetitionNo(nr);
+              current->SetEchoNo(ne);
+            
+              current->SetRepetitionNo(nr);
 	    
-	    current->SetDataFormat(m_data_format);
+              current->SetDataFormat(m_data_format);
 
-	    current->SetFilePosition(position);
-	    position += profile_data_length;
-	    
+              current->SetFilePosition(position);
+              position += profile_data_length;
+            }	    
 	  }
 	}
       }
@@ -854,6 +891,9 @@ void BrukerProfileListGenerator::PrintParameters()
     std::cout << m_ACQ_obj_order[i] << " ";
   }
   std::cout << std::endl;
+  
+  std::cout << "NSLICES: " << m_NSLICES << std::endl;
+  std::cout << "ACQ_n_echo_images: " << m_ACQ_n_echo_images << std::endl;
   
   std::cout << "ACQ_phase_factor: " << m_ACQ_phase_factor << std::endl;
   std::cout << "ACQ_rare_factor: " << m_ACQ_rare_factor << std::endl;

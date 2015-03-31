@@ -43,6 +43,12 @@ public:
   void SetObjectNo(unsigned int);
   unsigned int GetObjectNo();
 
+  void SetSliceNo(unsigned int);
+  unsigned int GetSliceNo();
+
+  void SetEchoNo(unsigned int);
+  unsigned int GetEchoNo();
+
   void SetRepetitionNo(unsigned int);
   unsigned int GetRepetitionNo();
 
@@ -85,6 +91,8 @@ protected:
   int m_iEncodeStep2;    /* kz */
   unsigned int m_uiChannelNo;   
   unsigned int m_uiObjectNo;       /* of NI */
+  unsigned int m_uiSliceNo;         /* of NSLICES */    
+  unsigned int m_uiEchoNo;         /* of ACQ_n_echo_images */    
   unsigned int m_uiRepetitionNo;   /* of NR */
 
   unsigned long int m_ulFilePosition;
@@ -121,6 +129,8 @@ public:
   int GetNumberOfDimensions() { return m_ACQ_dim; }
   int GetDimensionSize(int dimension = 0);
   int GetNumberOfObjects() {return m_NI;}
+  int GetNumberOfSlices() {return m_NSLICES;}
+  int GetNumberOfEchos() {return  m_ACQ_n_echo_images;}
   int GetNumberOfRepetitions() { return m_NR; }
   int GetMinEncodingStep1() { return m_ky_min; }
   int GetMaxEncodingStep1() { return m_ky_max; }
@@ -137,6 +147,8 @@ protected:
   float* m_PVM_AntiAlias;
   int  m_NI;
   int* m_ACQ_obj_order;
+  int  m_NSLICES;
+  int  m_ACQ_n_echo_images;
   int  m_ACQ_phase_factor;
   int  m_ACQ_rare_factor;
   int  m_NR;
