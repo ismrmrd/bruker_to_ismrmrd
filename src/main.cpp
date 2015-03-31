@@ -33,7 +33,8 @@ int main(int argc, char** argv)
             ("help,h", "produce help message")
             ("filename,f", po::value<std::string>(&in_filename), "Input file")
             ("outfile,o", po::value<std::string>(&out_filename)->default_value("out.h5"), "Output file")
-            ("out-group,G", po::value<std::string>(&out_group)->default_value("dataset"), "Output group name")  
+            ("out-group,G", po::value<std::string>(&out_group)->default_value("dataset"), "Output group name") 
+            ("no-subject,N","no subject information") 
             ;
 
     po::variables_map vm;
@@ -51,16 +52,22 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    std::cout << "Burker ISMRMRD converter" << std::endl;
+    bool subject_info = true;
+    if(vm.count("no-subject")) subject_info = false;
+
+    std::cout << "Bruker ISMRMRD converter" << std::endl;
 
     // The names of the files in the Bruker dataset
     std::string fidfilename = in_filename + std::string("/fid");
     std::string acqpfilename = in_filename + std::string("/acqp");
     std::string methodfilename = in_filename + std::string("/method");
+    unsigned slashloc = in_filename.find_last_of("/");
+    std::string subjectfilename = in_filename.substr(0,slashloc+1) + std::string("subject");
 
     // Parse Bruker parameters
     BrukerParameterFile acqpar(acqpfilename);
     BrukerParameterFile methodpar(methodfilename);
+    BrukerParameterFile subjectpar(subjectfilename);
 
     // Get the profile list and the first profile
     BrukerProfileListGenerator lg;
@@ -95,35 +102,70 @@ int main(int argc, char** argv)
     int fovy = p->GetValue(1)->GetIntValue();
     p = acqpar.FindParameter("ACQ_slice_thick");
     int fovz = p->GetValue(0)->GetIntValue();
-
+    p = subjectpar.FindParameter("SUBJECT_name_string");
+    std::string subject_name = p->GetValue(0)->GetStringValue();
+    p = subjectpar.FindParameter("SUBJECT_study_name");
+    std::string study_description = p->GetValue(0)->GetStringValue();
+    p = subjectpar.FindParameter("SUBJECT_study_instance_uid");
+    std::string study_instanceUID = p->GetValue(0)->GetStringValue();
+    p = subjectpar.FindParameter("SUBJECT_entry");
+    std::string patient_entry = p->GetValue(0)->GetStringValue();
+    p = subjectpar.FindParameter("SUBJECT_position");
+    std::string patient_position = p->GetValue(0)->GetStringValue();
+    p = subjectpar.FindParameter("SUBJECT_date");
+    std::string study_date = p->GetValue(0)->GetStringValue();
     p = methodpar.FindParameter("PVM_SpatDimEnum");
     std::string image_type = p->GetValue(0)->GetStringValue(); // 2D or 3D acq marker
-    p = methodpar.FindParameter("PVM_NSPacks");
-    int nspack = p->GetValue(0)->GetIntValue();
-    float read_offset_mm[nspack]; //each package has a set of offsets
-    p = methodpar.FindParameter("PVM_SPackArrReadOffset"); 
-    for ( int i=0; i<nspack ; i++ ) { 
-       read_offset_mm[i] = p->GetValue(i)->GetFloatValue();
+    bool threed = image_type.compare("2D");
+    p = acqpar.FindParameter("NI");
+    int nimages = p->GetValue(0)->GetIntValue();
+    float read_offset_mm[nimages];
+    p = acqpar.FindParameter("ACQ_read_offset");
+    for ( int i=0; i< nimages; i++ ) {
+        read_offset_mm[i] = p->GetValue(i)->GetFloatValue();
     }
-    float phase1_offset_mm[nspack]; 
-    p = methodpar.FindParameter("PVM_SPackArrPhase1Offset");
-    for ( int i=0; i<nspack ; i++ ) {
-       phase1_offset_mm[i] = p->GetValue(i)->GetFloatValue();
+    float phase1_offset_mm[nimages];
+    p = acqpar.FindParameter("ACQ_phase1_offset");
+    for ( int i=0; i<nimages; i++ ) {
+        phase1_offset_mm[i] = p->GetValue(i)->GetFloatValue();
     }
-      p = methodpar.FindParameter("PVM_SPackArrSliceOrient");
-      std::string slice_orientation[nspack];
-      for ( int i=0; i<nspack ; i++ ) {
-          slice_orientation[i] = p->GetValue(i)->GetStringValue();
-      }
-      p = methodpar.FindParameter("PVM_SPackArrReadOrient");
-      std::string read_orientation[nspack];
-      for( int i=0; i<nspack ;i++ ) {
-          read_orientation[i] = p->GetValue(i)->GetStringValue();
-      }
+    float phase2_offset_mm[nimages];
+    p = acqpar.FindParameter("ACQ_phase2_offset");
+    for ( int i=0; i<nimages; i++ ) {
+        phase2_offset_mm[i] = p->GetValue(i)->GetFloatValue();
+    }
+    float slice_offset_mm[nimages];
+    p = acqpar.FindParameter("ACQ_slice_offset");
+    for ( int i=0; i<nimages; i++ ) {
+        slice_offset_mm[i] = p->GetValue(i)->GetFloatValue();
+    }
+    int obj_order[nimages]; // slice order
+    p = acqpar.FindParameter("ACQ_obj_order");
+    for ( int i=0; i < nimages; i++ ) {
+        obj_order[i] = p->GetValue(i)->GetIntValue();
+    }
+    float grad_matrix[nimages][3][3]; // orientation info
+    p = acqpar.FindParameter("ACQ_grad_matrix");
+    int gmcnt=0;
+    for ( int i=0; i<nimages; i++ ) {
+        for ( int j=0; j<3; j++ ) {
+            for ( int k=0; k<3; k++ ) {
+                 grad_matrix[i][j][k] = p->GetValue(gmcnt)->GetFloatValue();
+                 gmcnt++;
+            }
+         }
+     }
+
 
     // Write some info out to the user
     //lg.PrintParameters();            
-    std::cout << "Spatial Dimensions: " << image_type << std::endl;
+    //std::cout << "Spatial Dimensions: " << image_type << std::endl;
+    //std::cout << "im type" << threed << std::endl;
+    std::cout << "Subject name: " << subject_name << std::endl;
+    std::cout << "Study description: " << study_description << std::endl;
+    std::cout << "Study instance: " << study_instanceUID << std::endl;
+    std::cout << "Patient entry: " << patient_entry << std::endl;
+    std::cout << "Patient Position: " << patient_position << std::endl;    
     //std::cout << "Frequency: " << freq << std::endl;
     //std::cout << "Number of channels: " << nc << std::endl;
     //std::cout << "Nx: " << nx << std::endl;
@@ -132,19 +174,6 @@ int main(int argc, char** argv)
     //std::cout << "FOV_x: " << fovx << std::endl;
     //std::cout << "FOV_y: " << fovy << std::endl;
     //std::cout << "FOV_z: " << fovz << std::endl;
-    std::cout <<"nspack: " << nspack << std::endl;
-    for ( int i=0; i< nspack; i++) {
-       std::cout <<"read_offset_mm[" << i <<  "]: " << read_offset_mm[i] << std::endl;
-    }
-    for ( int i=0; i< nspack; i++) {
-       std::cout <<"phase1_offset_mm[" << i << "]: " << phase1_offset_mm[i] << std::endl;
-    }
-    for ( int i=0; i< nspack; i++) {
-        std::cout << "Slice Orientation:[" << i << "]:" << slice_orientation[i] << std::endl;
-    }
-    for ( int i=0; i< nspack; i++) {
-        std::cout << "Read Orientation:[" << i << "]:" << read_orientation[i] << std::endl;
-    }
 
     // Create the dataset
     ISMRMRD::Dataset dataset(out_filename.c_str(), out_group.c_str());
@@ -227,6 +256,12 @@ int main(int argc, char** argv)
         acq.idx().kspace_encode_step_1 = current->GetEncodeStep1()+(size_ky>>1);
         acq.idx().slice = current->GetObjectNo();
         acq.idx().repetition = current->GetRepetitionNo();
+        int curslice = counter % nimages;
+        for ( int i=0; i<2; i++ ) {
+             acq.read_dir()[i] = grad_matrix[curslice][0][i];
+             acq.phase_dir()[i] = grad_matrix[curslice][1][i];
+             acq.slice_dir()[i] = grad_matrix[curslice][2][i];
+        }
 
         // Set some flags
         // TODO: this needs fleshing out
