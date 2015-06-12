@@ -581,7 +581,7 @@ void BrukerProfileListGenerator::ExtractParametersFromAcq(BrukerParameterFile* a
   }
 
   if (method) {
-    p = method->FindParameter(std::string("PVM_EncAvailReceivers"));
+    p = method->FindParameter(std::string("PVM_EncNReceivers"));
     if (p) {
       m_NumChannels = p->GetValue(0)->GetIntValue();
     }
