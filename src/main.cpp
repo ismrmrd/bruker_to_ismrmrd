@@ -61,8 +61,7 @@ int main(int argc, char** argv)
     std::string fidfilename = in_filename + std::string("/fid");
     std::string acqpfilename = in_filename + std::string("/acqp");
     std::string methodfilename = in_filename + std::string("/method");
-    unsigned slashloc = in_filename.find_last_of("/");
-    std::string subjectfilename = in_filename.substr(0,slashloc+1) + std::string("subject");
+    std::string subjectfilename = in_filename + std::string("/../subject");
 
     // Parse Bruker parameters
     BrukerParameterFile acqpar(acqpfilename);
