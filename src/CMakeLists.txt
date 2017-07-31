@@ -3,7 +3,7 @@ add_subdirectory(libbruker)
 
 # Build the converter
 find_package(Ismrmrd REQUIRED)
-
+find_package(HDF5 REQUIRED)
 #set(Boost_NO_BOOST_CMAKE ON)
 
 if(WIN32)
@@ -17,14 +17,14 @@ if(WIN32)
 endif(WIN32)
 
 include_directories(
-  ${Boost_INCLUDE_DIR}	
+  ${Boost_INCLUDE_DIR} ${HDF5_INCLUDE_DIRS}
   ${ISMRMRD_INCLUDE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/libbruker
   )
 
 add_executable(bruker_to_ismrmrd main.cpp)
-target_link_libraries(bruker_to_ismrmrd bruker ${ISMRMRD_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(bruker_to_ismrmrd bruker ${ISMRMRD_LIBRARIES} ${Boost_LIBRARIES} ${HDF5_LIBRARIES})
 
 install(TARGETS bruker_to_ismrmrd DESTINATION bin COMPONENT main)
 
