@@ -22,6 +22,8 @@
 #include <fstream>
 #include <vector>
 #include <math.h>
+#include <climits>
+#include <cstdlib>
 
 enum {VARIABLE_START = 1,
       VIS_START,
