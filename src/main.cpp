@@ -208,7 +208,7 @@ int main(int argc, char** argv)
     e.reconSpace.fieldOfView_mm.x = fovx;
     e.reconSpace.fieldOfView_mm.y = fovy;
     e.reconSpace.fieldOfView_mm.z = fovz;
-    e.trajectory = "cartesian";
+    e.trajectory = ISMRMRD::TrajectoryType::CARTESIAN;
     e.encodingLimits.kspace_encoding_step_1 = ISMRMRD::Limit(0, ny-1, ny/2);
     if (size_kz > 1) {
         e.encodingLimits.kspace_encoding_step_2 = ISMRMRD::Limit(0, size_kz-1, size_kz/2);

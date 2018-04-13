@@ -12,5 +12,9 @@ endif (NOT CMAKE_BUILD_TYPE)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
+if(CMAKE_COMPILER_IS_GNUCXX)
+	set (CMAKE_CXX_STANDARD 11)
+endif()
+
 # build the tools
 add_subdirectory(src)
